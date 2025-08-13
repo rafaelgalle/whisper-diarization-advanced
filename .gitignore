@@ -1,0 +1,6 @@
+.cog
+.vscode
+__pycache__
+.env
+models
+predict_local.py
