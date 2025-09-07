@@ -1,11 +1,6 @@
-# Configuration for Cog ⚙️
-# Reference: https://github.com/replicate/cog/blob/main/docs/yaml.md
-
 build:
-  # set to true if your model requires a GPU
   gpu: true
 
-  # a list of ubuntu apt packages to install
   system_packages:
     - "ffmpeg"
     - "libmagic1"
@@ -13,15 +8,10 @@ build:
     # - "libgl1-mesa-glx"
     # - "libglib2.0-0"
 
-  # python version in the form '3.8' or '3.8.12'
   python_version: "3.10"
-
   python_requirements: requirements.txt
 
-  # commands run after the environment is setup
   run:
     - "echo env is ready!"
-    # - "echo another command if needed"
 
-# predict.py defines how predictions are run on your model
-predict: "predict.py:Predictor"
+predict: "cog_predictor.py:Predictor"
