@@ -1,24 +1,56 @@
 ### Based on:
 
-This project is based on [thomasmol/whisper-diarization](https://github.com/thomasmol/cog-whisper-diarization), with some enhancements for use with low quality audios and non-english speech.
+This project is based on [thomasmol/whisper-diarization](https://github.com/thomasmol/cog-whisper-diarization), with some enhancements for use with low quality audios and stereo audios.
 
-# Cog Whisper Diarization
+# Whisper Diarization Advanced
 
-Noise reduction + Voice enhancement + High/Low-pass filtering + Audio transcription + Speaker diarization.
+**The fastest, most affordable, and customizable speech diarization pipeline for noisy, multi-speaker audio.**
 
-Advanced Whisper-based speech diarization pipeline with built-in preprocessing for noisy, multi-channel call center and VoIP audio. Features audio sanitization, noise reduction, channel-based speaker separation, normalization, and future sentiment analysis support. Ideal for low-quality stereo or multi-speaker recordings.
+---
 
-## AI/ML Models used
+## Why Use This Project?
 
-- Whisper Large v3 ~~Turbo~~ (CTranslate 2 version `faster-whisper==1.1.1`)
-- Pyannote audio 3.3.1
+- **Ultra Fast & Cost-Effective:** Optimized for Replicate.com and GPU/CPU environments, delivering rapid results at minimal cost.
+- **Highly Customizable:** Choose your model, device, and audio preprocessing level. Fine-tune for your use case—call centers, interviews, podcasts, meetings, and more.
+- **Advanced Audio Treatment:** Built-in options for sanitization, high/low-pass filtering, aggressive noise reduction, and RMS normalization. Tame even the worst audio!
+- **Stereo Channel Support:** Perfect for call center recordings—transcribes each channel separately for maximum speaker accuracy.
+- **Multi-Input Flexibility:** Accepts direct file upload, URL, or base64 string. Integrate easily with any workflow.
+- **Speaker Diarization & Transcription:** State-of-the-art Whisper and Pyannote models for accurate speech-to-text and speaker separation.
+- **Translation & Language Detection:** Auto-detects language and can translate speech to English for global applications.
+- **Scalable & Production-Ready:** Designed for batch processing, API integration, and large-scale deployments.
+
+---
+
+## Features
+
+- **Noise Reduction + Voice Enhancement**
+- **High/Low-Pass Filtering**
+- **Audio Sanitization (mono, 16kHz, PCM)**
+- **Channel-Based Speaker Separation**
+- **RMS Normalization**
+- **Sentiment Analysis (roadmap)**
+- **Custom Vocabulary/Hotwords**
+- **Flexible Preprocessing Levels (0-4)**
+
+---
 
 ## Usage
 
-- try at [Replicate](https://replicate.com/../...)
-- Or deploy yourself on [Replicate](https://replicate.com/) or any machine with a GPU 
+Try it instantly on [Replicate.com](https://replicate.com/) or deploy on your own GPU/CPU server.
 
-### Input
+### Running Locally with Cog
+
+1. Install and configure [Cog](https://replicate.com/docs/cog):
+   ```bash
+   pip install cog
+   cog init  # if you haven't initialized a Cog project yet
+2. Once your model is set up, you can run predictions locally:
+   ```bash
+   cog predict -i file_path=@input.wav -i num_speakers=2
+3. You can pass any other parameters supported by the model in the same way
+   ```bash
+   cog predict -i file_path=@input.wav -i num_speakers=2 -i some_param=value
+### Input Options
 
 - `file_string: str`: Either provide a Base64 encoded audio file.
 - `file_url: str`: Or provide a direct audio file URL.
@@ -46,10 +78,6 @@ Advanced Whisper-based speech diarization pipeline with built-in preprocessing f
 - `num_speakers: int`: Number of speakers (detected, unless specified in input).
 - `language: str`: Language of the spoken words as a language code like 'en' (detected, unless specified in input).
 
-### Roadmap / Next Steps
-- Sentiment analysis: Classify speech as neutral, negative, or positive.
-- Channel-based speaker identification: Detect speakers by audio channel instead of pyannote.
-- For stereo call center audio (one channel per speaker), transcribe each channel separately for maximum accuracy.
 
 ### Notes & Tips
 The higher the noise reduction level, the more vocal characteristics are lost, which can make diarization harder.
@@ -57,11 +85,41 @@ The higher the noise reduction level, the more vocal characteristics are lost, w
 
 Noise reduction is mainly used to improve pause-time detection. Sometimes, background noise can cause incorrect timestamps.
 
+---
+
+## Ideal Use Cases
+
+- **Call Centers:** Stereo channel separation for agent/customer
+- **Meetings & Interviews:** Multi-speaker diarization
+- **Podcasts & Broadcasts:** Clean transcription from noisy sources
+- **VoIP & Low-Quality Audio:** Advanced noise handling
+
+---
+
+## Roadmap / Next Steps
+- Sentiment analysis: Classify speech as neutral, negative, or positive
+- Summarize content
+- PII Mask
+
+## Cost
+- **$0.000975 per second of execution**
+
+## Speed & Cost
+- **Mono**  
+  Using an *Nvidia L40S GPU*, transcribes **5 minutes** of audio (2 speakers) in **8.1 seconds** — cost: **$0.0079**
+
+- **Stereo**  
+  Using an *Nvidia L40S GPU*, transcribes **5 minutes** of audio (2 speakers) in **4.6 seconds** — cost: **$0.0044**
+
 ## Thanks to
 
-- [thomasmol/whisper-diarization](https://github.com/thomasmol/cog-whisper-diarization) - Project used as a basis
-- [pyannote](https://github.com/pyannote/pyannote-audio) - Speaker diarization model
-- [whisper](https://github.com/openai/whisper) - Speech recognition model
-- [faster-whisper](https://github.com/SYSTRAN/faster-whisper) - Reimplementation of Whisper model for faster inference
-- [cog](https://github.com/replicate/cog) - ML containerization framework
+- [thomasmol/whisper-diarization](https://github.com/thomasmol/cog-whisper-diarization)
+- [pyannote](https://github.com/pyannote/pyannote-audio)
+- [whisper](https://github.com/openai/whisper)
+- [faster-whisper](https://github.com/SYSTRAN/faster-whisper)
+- [cog](https://github.com/replicate/cog)
+
+---
+
+**Ready to get started? Try it now on Replicate.com and experience the fastest, most customizable speech diarization for your audio!**
 
