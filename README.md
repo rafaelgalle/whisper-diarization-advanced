@@ -1,12 +1,11 @@
-### Based on:
-
-This project is based on [thomasmol/whisper-diarization](https://github.com/thomasmol/cog-whisper-diarization), with some enhancements for use with low quality audios and stereo audios.
-
 # Whisper Diarization Advanced
 
-**The fastest, most affordable, and customizable speech diarization pipeline for noisy, multi-speaker audio.**
+**Ultra-fast, customizable speech-to-text and speaker diarization for noisy, multi-speaker audio. Includes advanced noise reduction, stereo channel support, and flexible audio preprocessing—ideal for call centers, meetings, and podcasts**
 
 ---
+
+<img width="2974" height="1085" alt="image" src="https://github.com/user-attachments/assets/260e925c-ca13-4ee4-90d5-f4150106cf5d" />
+
 
 ## Why Use This Project?
 
@@ -36,7 +35,7 @@ This project is based on [thomasmol/whisper-diarization](https://github.com/thom
 
 ## Usage
 
-Try it instantly on [Replicate.com](https://replicate.com/) or deploy on your own GPU/CPU server.
+Try it instantly on [Replicate.com](https://replicate.com/rafaelgalle/whisper-diarization-advanced) or deploy on your own GPU/CPU server.
 
 ### Running Locally with Cog
 
