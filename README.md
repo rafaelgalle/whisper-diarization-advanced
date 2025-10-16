@@ -69,6 +69,12 @@ Try it instantly on [Replicate.com](https://replicate.com/rafaelgalle/whisper-di
 - `prop_decrease: float`: Noise reduction intensity (0.0 to 1.0), where 1.0 is most aggressive.
 - `stationary: bool`: If True, assumes noise is stationary (constant background noise).
 - `target_dBFS: float`: Target loudness level for RMS normalization (e.g., -18.0).
+- `vad_filter: bool`: Enable Whisper's voice activity detection stage.
+- `vad_min_speech_ms: int`: Minimum speech duration (ms) to keep when VAD is enabled.
+- `vad_speech_pad_ms: int`: Amount of padding (ms) applied before/after detected speech when VAD is enabled.
+- `vad_threshold: float`: Positive threshold that signals speech onset for VAD.
+- `vad_neg_threshold: float`: Negative threshold that signals speech offset for VAD.
+- `model_name: str`: Whisper checkpoint to load (e.g., `large-v3-turbo`, `medium`, `small`).
   
 ### Output
 

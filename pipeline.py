@@ -97,7 +97,12 @@ class WhisperDiarizationPipeline:
         lowpass_freq: int = 8000,
         prop_decrease: float = 1.0,
         stationary: bool = True,
-        target_dBFS: float = -18.0
+        target_dBFS: float = -18.0,
+        vad_filter: bool = True,
+        vad_min_speech_ms: int = 50,
+        vad_speech_pad_ms: int = 300,
+        vad_threshold: float = 0.15,
+        vad_neg_threshold: float = 0.05,
     ) -> Output:
         """Run a single prediction on the model."""
         temp_input, temp_dir = self._get_file(file_path, file_url, file_string)
@@ -124,7 +129,16 @@ class WhisperDiarizationPipeline:
             
                 print(f"DEBUG --> Starting transcribing mono")
                 segments, detected_num_speakers, detected_language = self.speech_to_text(
-                    audio_for_model, num_speakers, prompt or "", language, translate
+                    audio_for_model,
+                    num_speakers,
+                    prompt or "",
+                    language,
+                    translate,
+                    vad_filter=vad_filter,
+                    vad_min_speech_ms=vad_min_speech_ms,
+                    vad_speech_pad_ms=vad_speech_pad_ms,
+                    vad_threshold=vad_threshold,
+                    vad_neg_threshold=vad_neg_threshold,
                 )
                 return Output(segments, detected_language, detected_num_speakers)
 
@@ -155,7 +169,17 @@ class WhisperDiarizationPipeline:
                 
                 print(f"DEBUG --> Starting transcribing stereo channel 0")
                 # ch1_segments, info1 = self._transcribe_audio_ch0_mock(ch1_proc, language, prompt or "", translate)
-                ch1_segments, info1 = self._transcribe_audio(ch1_proc, language, prompt or "", translate)
+                ch1_segments, info1 = self._transcribe_audio(
+                    ch1_proc,
+                    language,
+                    prompt or "",
+                    translate,
+                    vad_filter=vad_filter,
+                    vad_min_speech_ms=vad_min_speech_ms,
+                    vad_speech_pad_ms=vad_speech_pad_ms,
+                    vad_threshold=vad_threshold,
+                    vad_neg_threshold=vad_neg_threshold,
+                )
                 for s in ch1_segments:
                     s["speaker"] = "SPEAKER_00"
                     for w in s["words"]:
@@ -164,7 +188,17 @@ class WhisperDiarizationPipeline:
 
                 print(f"DEBUG --> Starting transcribing stereo channel 1")
                 # ch2_segments, info2 = self._transcribe_audio_ch1_mock(ch2_proc, language, prompt or "", translate)
-                ch2_segments, info2 = self._transcribe_audio(ch2_proc, language, prompt or "", translate)
+                ch2_segments, info2 = self._transcribe_audio(
+                    ch2_proc,
+                    language,
+                    prompt or "",
+                    translate,
+                    vad_filter=vad_filter,
+                    vad_min_speech_ms=vad_min_speech_ms,
+                    vad_speech_pad_ms=vad_speech_pad_ms,
+                    vad_threshold=vad_threshold,
+                    vad_neg_threshold=vad_neg_threshold,
+                )
                 for s in ch2_segments:
                     s["speaker"] = "SPEAKER_01"
                     for w in s["words"]:
@@ -215,12 +249,26 @@ class WhisperDiarizationPipeline:
         prompt: str = "",
         language: Optional[str] = None,
         translate: bool = False,
+        *,
+        vad_filter: bool = True,
+        vad_min_speech_ms: int = 50,
+        vad_speech_pad_ms: int = 300,
+        vad_threshold: float = 0.15,
+        vad_neg_threshold: float = 0.05,
     ) -> Tuple[List[Dict], int, str]:
         time_start = time.time()
 
         # segments, transcript_info = self._transcribe_audio_mock(
         segments, transcript_info = self._transcribe_audio(
-            audio_file_wav, language, prompt, translate
+            audio_file_wav,
+            language,
+            prompt,
+            translate,
+            vad_filter=vad_filter,
+            vad_min_speech_ms=vad_min_speech_ms,
+            vad_speech_pad_ms=vad_speech_pad_ms,
+            vad_threshold=vad_threshold,
+            vad_neg_threshold=vad_neg_threshold,
         )
         print(f"DEBUG --> Finished transcribing, {len(segments)} segments")
 
@@ -237,23 +285,41 @@ class WhisperDiarizationPipeline:
 
         return final_segments, detected_num_speakers, transcript_info.language
 
-    def _transcribe_audio(self, audio_file_wav, language, prompt, translate):
+    def _transcribe_audio(
+        self,
+        audio_file_wav,
+        language,
+        prompt,
+        translate,
+        *,
+        vad_filter: bool = True,
+        vad_min_speech_ms: int = 50,
+        vad_speech_pad_ms: int = 300,
+        vad_threshold: float = 0.15,
+        vad_neg_threshold: float = 0.05,
+    ):
+        vad_params = None
+        if vad_filter:
+            vad_params = VadOptions(
+                max_speech_duration_s=self.model.feature_extractor.chunk_length,
+                min_speech_duration_ms=vad_min_speech_ms,
+                speech_pad_ms=vad_speech_pad_ms,
+                threshold=vad_threshold,
+                neg_threshold=vad_neg_threshold,
+            )
+
         options = dict(
             language=language,
             beam_size=5,
-            vad_filter=True,
-            vad_parameters=VadOptions(
-                max_speech_duration_s=self.model.feature_extractor.chunk_length,
-                min_speech_duration_ms=100,
-                speech_pad_ms=100,
-                threshold=0.25,
-                neg_threshold=0.2,
-            ),
+            vad_filter=vad_filter,
             word_timestamps=True,
             initial_prompt=prompt,
             language_detection_segments=1,
             task="translate" if translate else "transcribe",
         )
+        if vad_params is not None:
+            options["vad_parameters"] = vad_params
+
         segments, transcript_info = self.model.transcribe(audio_file_wav, **options)
         segments = list(segments)
         segments = [

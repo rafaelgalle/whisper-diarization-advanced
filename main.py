@@ -18,6 +18,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--prop_decrease", type=float, default=0.3)
     p.add_argument("--stationary", type=bool, default=True)
     p.add_argument("--target_dBFS", type=float, default=-18.0)
+    p.add_argument("--vad_filter", type=bool, default=True)
+    p.add_argument("--vad_min_speech_ms", type=int, default=50)
+    p.add_argument("--vad_speech_pad_ms", type=int, default=300)
+    p.add_argument("--vad_threshold", type=float, default=0.15)
+    p.add_argument("--vad_neg_threshold", type=float, default=0.05)
     p.add_argument("--device", type=str, default="cpu", choices=["cpu","cuda"])
     p.add_argument("--compute_type", type=str, default="int8")
     p.add_argument("--model_name", type=str, default="large-v3-turbo")
@@ -46,6 +51,11 @@ def main():
         prop_decrease=args.prop_decrease,
         stationary=args.stationary,
         target_dBFS=args.target_dBFS,
+        vad_filter=args.vad_filter,
+        vad_min_speech_ms=args.vad_min_speech_ms,
+        vad_speech_pad_ms=args.vad_speech_pad_ms,
+        vad_threshold=args.vad_threshold,
+        vad_neg_threshold=args.vad_neg_threshold,
     )
 
     print(result.to_dict())
