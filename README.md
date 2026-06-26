@@ -37,18 +37,63 @@
 
 Try it instantly on [Replicate.com](https://replicate.com/rafaelgalle/whisper-diarization-advanced) or deploy on your own GPU/CPU server.
 
-### Running Locally with Cog
+### Running Locally
 
-1. Install and configure [Cog](https://replicate.com/docs/cog):
-   ```bash
-   pip install cog
-   cog init  # if you haven't initialized a Cog project yet
-2. Once your model is set up, you can run predictions locally:
-   ```bash
-   cog predict -i file_path=@input.wav -i num_speakers=2
-3. You can pass any other parameters supported by the model in the same way
-   ```bash
-   cog predict -i file_path=@input.wav -i num_speakers=2 -i some_param=value
+You can run the project locally using the provided helper script. The
+script automatically:
+
+-   Creates a Python virtual environment
+-   Installs dependencies
+-   Downloads the required model files
+-   Runs inference on the provided audio file
+
+#### Step 1: Configure your Hugging Face token
+
+This project requires a Hugging Face access token.
+
+You have two options:
+
+##### Option A --- Create a secret file (recommended)
+
+Create the following file:
+
+``` bash
+mkdir -p /run/secrets
+echo "hf_your_token_here" > /run/secrets/HF_TOKEN
+```
+
+The script will automatically read the token from this location.
+
+##### Option B --- Update the script directly
+
+Open `run_local.sh` and replace:
+
+``` bash
+hf_TOKEN_HERE
+```
+
+with your actual Hugging Face token.
+
+#### Step 2: Run the script
+
+Execute:
+
+``` bash
+./run_local.sh audio.wav
+```
+
+Replace `audio.wav` with the path to your audio file:
+
+``` bash
+./run_local.sh ./samples/interview.wav
+```
+
+#### Step 3: Check the results
+
+The script will process the audio and print the output once execution
+completes.
+
+
 ### Input Options
 
 - `file_string: str`: Either provide a Base64 encoded audio file.
@@ -77,7 +122,6 @@ Try it instantly on [Replicate.com](https://replicate.com/rafaelgalle/whisper-di
 - `num_speakers: int`: Number of speakers (detected, unless specified in input).
 - `language: str`: Language of the spoken words as a language code like 'en' (detected, unless specified in input).
 
-
 ### Notes & Tips
 The higher the noise reduction level, the more vocal characteristics are lost, which can make diarization harder.
 (This is why upcoming updates will support channel-based speaker separation.)
@@ -100,10 +144,7 @@ Noise reduction is mainly used to improve pause-time detection. Sometimes, backg
 - Summarize content
 - PII Mask
 
-## Cost
-- **$0.000975 per second of execution**
-
-## Speed & Cost
+## Speed & Cost (On Replicate.com)
 - **Mono**  
   Using an *Nvidia L40S GPU*, transcribes **5 minutes** of audio (2 speakers) in **8.1 seconds** — cost: **$0.0079**
 
@@ -121,4 +162,3 @@ Noise reduction is mainly used to improve pause-time detection. Sometimes, backg
 ---
 
 **Ready to get started? Try it now on Replicate.com and experience the fastest, most customizable speech diarization for your audio!**
-

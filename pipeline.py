@@ -4,7 +4,7 @@ import base64
 import subprocess
 import os
 import requests
-import time
+import logging
 import torch
 import torchaudio
 import tempfile
@@ -12,40 +12,101 @@ import shutil
 import re
 import pandas as pd
 import numpy as np
+from concurrent.futures import ThreadPoolExecutor
 from typing import List, Dict, Optional, Tuple
 from faster_whisper import WhisperModel
 from pyannote.audio import Pipeline as PyannotePipeline
 from faster_whisper.vad import VadOptions
 from preprocess import preprocess_audio
+from metrics_utils import AudioMetrics, SpeechActivityMetricsCalculator
+
+log = logging.getLogger(__name__)
+
+
+def _collect_cuda_diagnostics() -> Dict[str, Optional[str]]:
+    diagnostics: Dict[str, Optional[str]] = {
+        "torch_version": torch.__version__,
+        "torch_cuda_version": torch.version.cuda,
+        "cuda_available": None,
+        "cuda_device_name": None,
+        "ld_library_path": os.getenv("LD_LIBRARY_PATH"),
+    }
+
+    try:
+        diagnostics["cuda_available"] = str(torch.cuda.is_available())
+    except Exception as exc:
+        diagnostics["cuda_available"] = f"error: {exc}"
+        return diagnostics
+
+    if diagnostics["cuda_available"] == "True":
+        try:
+            diagnostics["cuda_device_name"] = torch.cuda.get_device_name(0)
+        except Exception as exc:
+            diagnostics["cuda_device_name"] = f"error: {exc}"
+
+    return diagnostics
 
 class Output:
-    def __init__(self, segments: List[Dict], language: Optional[str] = None, num_speakers: Optional[int] = None):
+    def __init__(
+        self,
+        segments: List[Dict],
+        metrics: AudioMetrics,
+        language: Optional[str] = None,
+        num_speakers: Optional[int] = None,
+    ):
         self.segments = segments
         self.language = language
         self.num_speakers = num_speakers
+        self.metrics = metrics
 
     def to_dict(self) -> Dict:
         return {
             "segments": self.segments,
             "language": self.language,
             "num_speakers": self.num_speakers,
+            "metrics": self.metrics.to_dict(),
         }
 
+WHISPER_MODEL_PATH = "/models/whisper/large-v2"
+DIARIZATION_MODEL_PATH = "/models/diarization/pyannote--speaker-diarization-community-1"
+
 class WhisperDiarizationPipeline:
-    def __init__(self, device: str = "cpu", compute_type: str = "int8", model_name: str = "large-v3-turbo"):
+    def __init__(self, device: str = "cpu", compute_type: str = "int8"):
         """Load models into memory."""
 
-        print(f"DEBUG --> Setup with {model_name}, {device}, {compute_type}")
+        diagnostics = _collect_cuda_diagnostics()
+        log.info(
+            "Pipeline bootstrap starting: device=%s compute_type=%s torch=%s torch_cuda=%s cuda_available=%s cuda_device=%s ld_library_path=%s",
+            device,
+            compute_type,
+            diagnostics["torch_version"],
+            diagnostics["torch_cuda_version"],
+            diagnostics["cuda_available"],
+            diagnostics["cuda_device_name"],
+            diagnostics["ld_library_path"],
+        )
+
+        log.info("Whisper model path: %s | Diarization model path: %s", WHISPER_MODEL_PATH, DIARIZATION_MODEL_PATH)
+
+        if device.startswith("cuda") and diagnostics["cuda_available"] != "True":
+            raise RuntimeError(
+                "CUDA device requested but torch.cuda.is_available() is not True. "
+                f"torch={diagnostics['torch_version']} torch.version.cuda={diagnostics['torch_cuda_version']} "
+                f"cuda_available={diagnostics['cuda_available']} ld_library_path={diagnostics['ld_library_path']}"
+            )
+
+        log.info("Loading faster-whisper model into memory")
         self.model = WhisperModel(
-            model_name,
+            WHISPER_MODEL_PATH,
             device=device,
             compute_type=compute_type,
+            local_files_only=True,
         )
-        token = os.getenv("HF_AUTH_TOKEN", "TOKEN_HERE")
+        log.info("Loading pyannote diarization pipeline into memory")
         self.diarization_model = PyannotePipeline.from_pretrained(
-            "pyannote/speaker-diarization-3.1",
-            use_auth_token=token,
+            DIARIZATION_MODEL_PATH,
         ).to(torch.device(device))
+        log.info("Pipeline bootstrap finished successfully")
 
     def _get_file(self, file_path=None, file_url=None, file_string=None) -> str:
         """
@@ -126,7 +187,8 @@ class WhisperDiarizationPipeline:
                 segments, detected_num_speakers, detected_language = self.speech_to_text(
                     audio_for_model, num_speakers, prompt or "", language, translate
                 )
-                return Output(segments, detected_language, detected_num_speakers)
+                metrics = self._build_metrics(audio_for_model, segments, num_channels=num_channels)
+                return Output(segments, metrics, language=detected_language, num_speakers=detected_num_speakers)
 
             else:
                 print(f"DEBUG --> Spliting channels")
@@ -153,30 +215,40 @@ class WhisperDiarizationPipeline:
                     ch1_proc = ch1_path
                     ch2_proc = ch2_path
                 
-                print(f"DEBUG --> Starting transcribing stereo channel 0")
-                # ch1_segments, info1 = self._transcribe_audio_ch0_mock(ch1_proc, language, prompt or "", translate)
-                ch1_segments, info1 = self._transcribe_audio(ch1_proc, language, prompt or "", translate)
+                def _run_transcription(channel_id: int, audio_path: str):
+                    print(f"DEBUG --> Starting transcribing stereo channel {channel_id}")
+                    return channel_id, *self._transcribe_audio(audio_path, language, prompt or "", translate)
+
+                with ThreadPoolExecutor(max_workers=2) as executor:
+                    futures = [
+                        executor.submit(_run_transcription, 0, ch1_proc),
+                        executor.submit(_run_transcription, 1, ch2_proc),
+                    ]
+                    results = {}
+                    for future in futures:
+                        channel_id, segments_out, info_out = future.result()
+                        results[channel_id] = (segments_out, info_out)
+
+                ch1_segments, info1 = results[0]
+                ch2_segments, info2 = results[1]
+
                 for s in ch1_segments:
                     s["speaker"] = "SPEAKER_00"
                     for w in s["words"]:
                         w["speaker"] = "SPEAKER_00"
-                # print(f"DEBUG --> Transcription stereo channel 0 {ch1_segments}")
 
-                print(f"DEBUG --> Starting transcribing stereo channel 1")
-                # ch2_segments, info2 = self._transcribe_audio_ch1_mock(ch2_proc, language, prompt or "", translate)
-                ch2_segments, info2 = self._transcribe_audio(ch2_proc, language, prompt or "", translate)
                 for s in ch2_segments:
                     s["speaker"] = "SPEAKER_01"
                     for w in s["words"]:
                         w["speaker"] = "SPEAKER_01"
-                # print(f"DEBUG --> Transcription stereo channel 1 {ch2_segments}")
-                        
+
                 print(f"DEBUG --> Merging segments")
                 # all_segments = sorted(ch1_segments + ch2_segments, key=lambda x: x["start"])
                 all_segments = self.merge_stereo_words(ch1_segments, ch2_segments)
 
                 detected_language = info1.language or info2.language
-                return Output(all_segments, detected_language, 2)
+                metrics = self._build_metrics(temp_input, all_segments, num_channels=num_channels)
+                return Output(all_segments, metrics, language=detected_language, num_speakers=2)
 
         except Exception as e:
             raise RuntimeError(f"Error running inference: {e}") from e
@@ -216,16 +288,12 @@ class WhisperDiarizationPipeline:
         language: Optional[str] = None,
         translate: bool = False,
     ) -> Tuple[List[Dict], int, str]:
-        time_start = time.time()
-
-        # segments, transcript_info = self._transcribe_audio_mock(
         segments, transcript_info = self._transcribe_audio(
             audio_file_wav, language, prompt, translate
         )
         print(f"DEBUG --> Finished transcribing, {len(segments)} segments")
 
         print("DEBUG --> Starting diarization")
-        # diarization, detected_num_speakers = self._diarize_audio_mock(
         diarization, detected_num_speakers = self._diarize_audio(
             audio_file_wav, num_speakers
         )
@@ -244,10 +312,10 @@ class WhisperDiarizationPipeline:
             vad_filter=True,
             vad_parameters=VadOptions(
                 max_speech_duration_s=self.model.feature_extractor.chunk_length,
-                min_speech_duration_ms=100,
-                speech_pad_ms=100,
-                threshold=0.25,
-                neg_threshold=0.2,
+                min_speech_duration_ms=50,
+                speech_pad_ms=300,
+                threshold=0.15,
+                neg_threshold=0.05,
             ),
             word_timestamps=True,
             initial_prompt=prompt,
@@ -278,19 +346,19 @@ class WhisperDiarizationPipeline:
  
     def _diarize_audio(self, audio_file_wav, num_speakers=None):
         waveform, sample_rate = torchaudio.load(audio_file_wav)
-        diarization = self.diarization_model(
+        output = self.diarization_model(
             {"waveform": waveform, "sample_rate": sample_rate},
             num_speakers=num_speakers,
         )
 
         diarize_segments = []
-        diarization_list = list(diarization.itertracks(yield_label=True))
-        for turn, _, speaker in diarization_list:
+        diarization_list = list(output.speaker_diarization)
+        for turn, speaker in diarization_list:
             diarize_segments.append(
                 {"start": turn.start, "end": turn.end, "speaker": speaker}
             )
 
-        unique_speakers = {speaker for _, _, speaker in diarization_list}
+        unique_speakers = {speaker for _, speaker in diarization_list}
         detected_num_speakers = len(unique_speakers)
 
         return diarize_segments, detected_num_speakers
@@ -313,10 +381,8 @@ class WhisperDiarizationPipeline:
         final_segments = []
 
         for segment in segments:
-            # Segment speaker
             speaker = self._assign_speaker_to_segment_or_word(segment, diarize_df)
 
-            # Word-level speakers
             words_with_speakers = []
             for word in segment["words"]:
                 word_speaker = self._assign_speaker_to_segment_or_word(word, diarize_df, fallback_speaker=speaker)
@@ -337,6 +403,7 @@ class WhisperDiarizationPipeline:
         for segment in final_segments:
             segment["text"] = re.sub(r"\s+", " ", segment["text"]).strip()
             segment["text"] = re.sub(r"\s+([.,!?])", r"\1", segment["text"])
+            segment["text"] = self._normalize_currency_in_text(segment["text"])
             segment["duration"] = segment["end"] - segment["start"]
 
         return final_segments
@@ -361,6 +428,7 @@ class WhisperDiarizationPipeline:
             if can_combine:
                 current_group["end"] = segment["end"]
                 current_group["text"] += " " + segment["text"]
+                # current_group["words"] = current_group.get("words", []) + segment.get("words", [])
             else:
                 grouped_segments.append(current_group)
                 current_group = segment.copy()
@@ -428,7 +496,7 @@ class WhisperDiarizationPipeline:
                     "start": w["start"],
                     "end": w["end"],
                     "speaker": w["speaker"],
-                    "text": w["word"],
+                    "text": w["word"].lstrip(),
                     "words": [w]
                 }
                 continue
@@ -438,7 +506,12 @@ class WhisperDiarizationPipeline:
                 and w["start"] <= current["end"] + merge_margin
             ):
                 current["end"] = w["end"]
-                current["text"] += " " + w["word"]
+                token_text = w["word"]
+                if token_text:
+                    if token_text[0].isspace():
+                        current["text"] += token_text
+                    else:
+                        current["text"] += " " + token_text
                 current["words"].append(w)
             else:
                 merged_segments.append(current)
@@ -446,11 +519,54 @@ class WhisperDiarizationPipeline:
                     "start": w["start"],
                     "end": w["end"],
                     "speaker": w["speaker"],
-                    "text": w["word"],
+                    "text": w["word"].lstrip(),
                     "words": [w]
                 }
 
         if current:
             merged_segments.append(current)
 
+        for segment in merged_segments:
+            text = segment.get("text", "")
+            text = re.sub(r"\s+", " ", text).strip()
+            text = re.sub(r"\s+([.,!?])", r"\1", text)
+            segment["text"] = self._normalize_currency_in_text(text)
+            segment["duration"] = segment["end"] - segment["start"]
+
         return merged_segments
+
+    def _build_metrics(self, audio_path: str, segments: List[Dict], num_channels: Optional[int] = None) -> AudioMetrics:
+        audio_duration = SpeechActivityMetricsCalculator.audio_duration_seconds(audio_path)
+        calculator = SpeechActivityMetricsCalculator(audio_duration, segments, num_channels=num_channels)
+        return calculator.compute()
+
+    def _normalize_currency_in_text(self, text: str) -> str:
+        """Normalize currency mentionings to a consistent format.
+
+        Examples normalized:
+        - "R $ 346, 90" -> "R$ 346,90"
+        - "R$346,90" -> "R$ 346,90" (ensure a space after symbol)
+
+        This is applied only to the final text output (post-processing) and
+        does not affect internal diarization or word-level timestamps.
+        """
+        if not text:
+            return text
+
+        # Pattern: R [optional spaces] $ [optional spaces] number (with dots/spaces) decimal-sep fraction
+        def repl(m):
+            integer = m.group(1) or ""
+            frac = m.group(2) or "00"
+            # remove spaces inside integer part
+            integer_clean = integer.replace(" ", "")
+            # keep existing dots (thousand separators) but also remove stray spaces
+            integer_clean = integer_clean
+            return f"R$ {integer_clean},{frac}"
+
+        # Normalize common variants where decimal uses , or . and there may be spaces
+        text = re.sub(r"R\s*\$\s*([0-9\.\s]+)[,\.]\s*([0-9]{2})", repl, text)
+
+        # If pattern like R$346,90 (no space), add a space after R$
+        text = re.sub(r"R\$(\d)", r"R$ \1", text)
+
+        return text

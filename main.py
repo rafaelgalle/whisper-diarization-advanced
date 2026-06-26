@@ -20,7 +20,6 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--target_dBFS", type=float, default=-18.0)
     p.add_argument("--device", type=str, default="cpu", choices=["cpu","cuda"])
     p.add_argument("--compute_type", type=str, default="int8")
-    p.add_argument("--model_name", type=str, default="large-v3-turbo")
     return p
 
 def main():
@@ -29,7 +28,6 @@ def main():
     pipeline = WhisperDiarizationPipeline(
         device=args.device,
         compute_type=args.compute_type,
-        model_name=args.model_name,
     )
 
     result = pipeline.predict(

@@ -1,9 +1,9 @@
 """Audio preprocessing utilities."""
-import os
+# import os
 import subprocess
 import numpy as np
-from scipy.io import wavfile
-from scipy.io.wavfile import write
+import torch
+import torchaudio
 import noisereduce as nr
 import tempfile
 import shutil
@@ -38,9 +38,8 @@ def apply_filters(input_path: str, filtered_path: str, highpass_freq: int, lowpa
 
 def reduce_noise(input_path: str, prop_decrease: float, stationary: bool):
     """Reduces audio noise and returns numpy float32 data and sample rate."""
-    rate, data = wavfile.read(input_path)
-    if data.dtype == np.int16:
-        data = data.astype(np.float32) / 32768.0
+    waveform, rate = torchaudio.load(input_path)
+    data = waveform.squeeze(0).numpy()
     reduced = nr.reduce_noise(
         y=data,
         sr=rate,
@@ -102,16 +101,19 @@ def preprocess_audio(
 
         rate, reduced = reduce_noise(temp2, prop_decrease, stationary)
         out_int16 = np.clip(reduced * 32768, -32768, 32767).astype(np.int16)
-        write(temp3, rate, out_int16)
+        waveform_to_save = torch.from_numpy(out_int16).unsqueeze(0)
+        torchaudio.save(temp3, waveform_to_save, rate)
         if preprocess_level == 3:
             shutil.copy(temp3, output_path)
             return
 
         normalized = normalize_audio(reduced, target_dBFS)
         out_int16 = np.clip(normalized * 32768, -32768, 32767).astype(np.int16)
-        write(output_path, rate, out_int16)
+        waveform_to_save = torch.from_numpy(out_int16).unsqueeze(0)
+        torchaudio.save(output_path, waveform_to_save, rate)
 
-        # debug_folder = "/home/rafaelgalle/Downloads/audio_debug"
+        # check the result after each stage
+        # debug_folder = "./audio_debug"
         # os.makedirs(debug_folder, exist_ok=True)
         # # shutil.copy(temp1, f"{debug_folder}/stage1.wav")
         # # shutil.copy(temp2, f"{debug_folder}/stage2.wav")
