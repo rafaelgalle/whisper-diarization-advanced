@@ -1,7 +1,10 @@
-"""Local entry point: python -m app.main --file_path input.wav ..."""
+"""Local entry point: python local/main.py --file_path input.wav ..."""
 from __future__ import annotations
 import argparse
-from pipeline import WhisperDiarizationPipeline
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from core.pipeline import WhisperDiarizationPipeline
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Local runner for Whisper + Diarization")

@@ -17,8 +17,8 @@ from typing import List, Dict, Optional, Tuple
 from faster_whisper import WhisperModel
 from pyannote.audio import Pipeline as PyannotePipeline
 from faster_whisper.vad import VadOptions
-from preprocess import preprocess_audio
-from metrics_utils import AudioMetrics, SpeechActivityMetricsCalculator
+from .preprocess import preprocess_audio
+from .metrics_utils import AudioMetrics, SpeechActivityMetricsCalculator
 
 log = logging.getLogger(__name__)
 

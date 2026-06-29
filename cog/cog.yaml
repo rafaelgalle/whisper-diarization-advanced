@@ -1,0 +1,20 @@
+build:
+  gpu: true
+  python_version: "3.12"
+  python_requirements: requirements.txt
+  system_packages:
+    - ffmpeg
+    - libmagic1
+    # - libsndfile1
+    # - libsndfile1-dev
+
+  run:
+    - mkdir -p /models/whisper /models/diarization
+    - python -c "import faster_whisper; faster_whisper.download_model('large-v2', output_dir='/models/whisper/large-v2')"
+    - command: python -c "from huggingface_hub import snapshot_download; token=open('/run/secrets/HF_TOKEN').read().strip(); snapshot_download(repo_id='pyannote/speaker-diarization-community-1', local_dir='/models/diarization/pyannote--speaker-diarization-community-1', token=token)"
+      mounts:
+        - type: secret
+          id: HF_TOKEN
+          target: /run/secrets/HF_TOKEN
+
+predict: predict.py:Predictor

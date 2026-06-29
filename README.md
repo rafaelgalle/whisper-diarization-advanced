@@ -33,68 +33,21 @@
 
 ---
 
-## Usage
+## Execution Methods
 
-Try it instantly on [Replicate.com](https://replicate.com/rafaelgalle/whisper-diarization-advanced) or deploy on your own GPU/CPU server.
+The core business logic is contained in the `core/` directory. Choose your preferred execution method:
 
-### Running Locally
+| Method | Location | Best For | Link |
+|--------|----------|----------|------|
+| **Local** | `/local` | Development, testing, custom preprocessing | [Instructions](./local/README.md) |
+| **Cog + Replicate** | `/cog` | Cloud deployment, easy scaling, instant sharing | [Instructions](./cog/README.md) |
+| **API** | `/api` | REST endpoint deployment, batch processing | [Instructions](./api/README.md) |
+| **GCP Cloud Run** | `/gcp_cloud_run` | Serverless, auto-scaling on Google Cloud | [Instructions](./gcp_cloud_run/README.md) |
+| **GCP VM** | `/gcp_vm` | Persistent instances on Google Cloud | [Instructions](./gcp_vm/README.md) |
 
-You can run the project locally using the provided helper script. The
-script automatically:
+---
 
--   Creates a Python virtual environment
--   Installs dependencies
--   Downloads the required model files
--   Runs inference on the provided audio file
-
-#### Step 1: Configure your Hugging Face token
-
-This project requires a Hugging Face access token.
-
-You have two options:
-
-##### Option A --- Create a secret file (recommended)
-
-Create the following file:
-
-``` bash
-mkdir -p /run/secrets
-echo "hf_your_token_here" > /run/secrets/HF_TOKEN
-```
-
-The script will automatically read the token from this location.
-
-##### Option B --- Update the script directly
-
-Open `run_local.sh` and replace:
-
-``` bash
-hf_TOKEN_HERE
-```
-
-with your actual Hugging Face token.
-
-#### Step 2: Run the script
-
-Execute:
-
-``` bash
-./run_local.sh audio.wav
-```
-
-Replace `audio.wav` with the path to your audio file:
-
-``` bash
-./run_local.sh ./samples/interview.wav
-```
-
-#### Step 3: Check the results
-
-The script will process the audio and print the output once execution
-completes.
-
-
-### Input Options
+## Input Parameters
 
 - `file_string: str`: Either provide a Base64 encoded audio file.
 - `file_url: str`: Or provide a direct audio file URL.
@@ -115,7 +68,7 @@ completes.
 - `stationary: bool`: If True, assumes noise is stationary (constant background noise).
 - `target_dBFS: float`: Target loudness level for RMS normalization (e.g., -18.0).
   
-### Output
+## Output
 
 - `segments: List[Dict]`: List of segments with speaker, start and end time.
   - Includes `avg_logprob` for each segment and `probability` for each word level segment.

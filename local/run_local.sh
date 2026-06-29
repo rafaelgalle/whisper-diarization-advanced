@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Simple helper to create venv, install requirements and run a test transcription.
-# Usage: ./scripts/run_local.sh /path/to/input.wav
+# Usage: ./run_local.sh /path/to/input.wav
+# Must be run from the project root.
 set -euo pipefail
 
 INPUT_FILE=${1:-}
@@ -15,7 +16,7 @@ python3.11 -m venv .venv
 source .venv/bin/activate
 
 echo "Installing project requirements..."
-pip install -r requirements.txt
+pip install -r ./requirements.txt
 
 echo "Downloading models..."
 mkdir -p /models/whisper /models/diarization
@@ -29,4 +30,4 @@ export HF_TOKEN=$(cat /run/secrets/HF_TOKEN 2>/dev/null || echo "hf_TOKEN_HERE")
 python -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='pyannote/speaker-diarization-community-1', local_dir='/models/diarization/pyannote--speaker-diarization-community-1', token='$HF_TOKEN')"
 
 echo "Running transcription on: $INPUT_FILE"
-python3 main.py --file_path "$INPUT_FILE"
+python3 ./main.py --file_path "$INPUT_FILE"

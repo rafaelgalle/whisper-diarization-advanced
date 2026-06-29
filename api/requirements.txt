@@ -1,0 +1,2 @@
+-r ../core/requirements.txt
+# fastapi==0.104.0
