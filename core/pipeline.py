@@ -454,13 +454,13 @@ class WhisperDiarizationPipeline:
         ch2_path = os.path.join(temp_dir, "channel2.wav")
 
         subprocess.run([
-            "ffmpeg", "-y", "-i", file_path, "-map_channel", "0.0.0",
-            "-acodec", "pcm_s16le", "-ac", "1", "-ar", "16000", ch1_path
+            "ffmpeg", "-y", "-i", file_path, "-af", "pan=mono|c0=c0",
+            "-acodec", "pcm_s16le", "-ar", "16000", ch1_path
         ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
         subprocess.run([
-            "ffmpeg", "-y", "-i", file_path, "-map_channel", "0.0.1",
-            "-acodec", "pcm_s16le", "-ac", "1", "-ar", "16000", ch2_path
+            "ffmpeg", "-y", "-i", file_path, "-af", "pan=mono|c0=c1",
+            "-acodec", "pcm_s16le", "-ar", "16000", ch2_path
         ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     
         return ch1_path, ch2_path
