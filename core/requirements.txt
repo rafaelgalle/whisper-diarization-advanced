@@ -1,9 +1,9 @@
-torch==2.8.0
+torch>=2.8.0
 requests
 pyannote-audio==4.0.4
-faster-whisper==1.2.1
+faster-whisper @ git+https://github.com/SYSTRAN/faster-whisper.git@2ce7f9d7
 numpy>=1.26.4
 pandas
 noisereduce>=3.0.3
-torchaudio==2.8.0
+torchaudio>=2.8.0
 huggingface_hub>=1.21.0,<2.0.0
